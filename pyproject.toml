@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "service-history-lambda"
+version = "0.1.0"
+description = "AWS Lambda for service history logging and retrieval."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "AI Agent", email = "agent@example.com" },
+]
+dependencies = [
+    "boto3>=1.28.0",
+    "pydantic>=2.0.0",
+    "python-dateutil>=2.8.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "moto",
+    "pytest-mock",
+    "pre-commit",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+lint.select = "E,F,W,I,N,D,ANN,S,C4,B,A,RUF"
+lint.ignore = "ANN101,ANN102"
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=src --cov-report=term-missing --cov-report=xml"
+testpaths = [
+    "tests",
+]
