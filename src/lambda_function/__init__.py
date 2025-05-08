@@ -6,7 +6,7 @@ data via AWS Lambda, supporting both API Gateway and AppSync events.
 
 __version__ = "0.1.0"
 
-from lambda_function.lambda_handler import (
+from .lambda_handler import (
     lambda_handler,
     ValidationError,
     handle_create_event,

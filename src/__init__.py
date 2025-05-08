@@ -6,6 +6,6 @@ logging and retrieval via API Gateway and AppSync.
 
 __version__ = "0.1.0"
 
-from lambda_function import lambda_handler, ValidationError
+from src.lambda_function import lambda_handler, ValidationError
 
 __all__ = ["lambda_handler", "ValidationError"]
