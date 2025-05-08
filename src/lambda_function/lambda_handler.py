@@ -53,7 +53,8 @@ def get_log_group_name() -> str:
         The configured log group name.
 
     Raises:
-        Exception: If unable to retrieve configuration.
+        ValidationError: If configuration is missing or invalid
+        Exception: If unable to retrieve configuration due to AWS service issues
     """
     try:
         response = appconfig_client.get_configuration(
@@ -62,16 +63,28 @@ def get_log_group_name() -> str:
             Configuration=CONFIG_PROFILE_ID,
             ClientId='ServiceHistoryLambda'
         )
-        config_data = json.loads(response['Content'].read())
+        
+        try:
+            config_data = json.loads(response['Content'].read())
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Invalid AppConfig configuration format: {str(e)}")
+            raise ValidationError(f"Invalid configuration format: {str(e)}")
+            
         log_group_name = config_data.get(LOG_GROUP_CONFIG_KEY)
 
         if not log_group_name:
             raise ValidationError(f"Configuration missing '{LOG_GROUP_CONFIG_KEY}' key")
+        
+        if not isinstance(log_group_name, str):
+            raise ValidationError(f"Invalid log group name type: expected string, got {type(log_group_name).__name__}")
 
         return log_group_name
+    except ValidationError:
+        # Re-raise validation errors
+        raise
     except Exception as e:
         logger.error(f"Failed to retrieve AppConfig configuration: {str(e)}")
-        raise
+        raise ValidationError(f"Could not retrieve log group configuration: {str(e)}")
 
 
 def extract_id_from_path(path: str) -> str:
@@ -84,12 +97,30 @@ def extract_id_from_path(path: str) -> str:
         The extracted ID
 
     Raises:
-        ValidationError: If ID cannot be extracted
+        ValidationError: If ID cannot be extracted or path is invalid
     """
-    match = re.search(r'/([^/]+)$', path)
-    if not match:
-        raise ValidationError("ID not found in request path")
-    return match.group(1)
+    try:
+        if not isinstance(path, str):
+            raise ValidationError(f"Invalid path format: expected string, got {type(path).__name__}")
+        
+        if not path:
+            raise ValidationError("Empty path provided")
+            
+        match = re.search(r'/([^/]+)$', path)
+        if not match:
+            raise ValidationError("ID not found in request path")
+        
+        id_value = match.group(1)
+        if not id_value:
+            raise ValidationError("Extracted ID is empty")
+            
+        return id_value
+    except ValidationError:
+        # Re-raise validation errors
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting ID from path '{path}': {str(e)}")
+        raise ValidationError(f"Failed to extract ID from path: {str(e)}")
 
 
 def validate_create_input(body: Dict[str, Any]) -> None:
@@ -101,11 +132,22 @@ def validate_create_input(body: Dict[str, Any]) -> None:
     Raises:
         ValidationError: If validation fails
     """
-    if not isinstance(body, dict):
-        raise ValidationError("Request body must be a JSON object")
+    try:
+        if body is None:
+            raise ValidationError("Request body cannot be None")
+            
+        if not isinstance(body, dict):
+            raise ValidationError(f"Request body must be a JSON object, got {type(body).__name__}")
 
-    if not body:
-        raise ValidationError("Request body cannot be empty")
+        if not body:
+            raise ValidationError("Request body cannot be empty")
+            
+    except ValidationError:
+        # Re-raise validation errors
+        raise
+    except Exception as e:
+        logger.error(f"Error validating create input: {str(e)}")
+        raise ValidationError(f"Input validation failed: {str(e)}")
 
 
 def validate_read_input(query_params: Dict[str, str], id_value: str) -> Tuple[datetime, datetime]:
@@ -162,15 +204,29 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
         data: The data to write
 
     Raises:
-        Exception: If write fails
+        ValidationError: If input validation fails
+        Exception: If write fails due to AWS service issues
     """
     try:
+        # Validate inputs
+        if not log_group_name:
+            raise ValidationError("Log group name cannot be empty")
+            
+        if not id_value:
+            raise ValidationError("ID value cannot be empty")
+            
+        if data is None:
+            raise ValidationError("Data cannot be None")
+
         # Ensure log group exists
         try:
             logs_client.create_log_group(logGroupName=log_group_name)
             logger.info(f"Created log group: {log_group_name}")
         except logs_client.exceptions.ResourceAlreadyExistsException:
             pass
+        except Exception as e:
+            logger.error(f"Error creating log group '{log_group_name}': {str(e)}")
+            raise ValidationError(f"Failed to create log group: {str(e)}")
 
         # Create a log stream with the ID and timestamp
         timestamp = int(time.time() * 1000)
@@ -183,6 +239,9 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
             )
         except logs_client.exceptions.ResourceAlreadyExistsException:
             pass
+        except Exception as e:
+            logger.error(f"Error creating log stream '{log_stream_name}': {str(e)}")
+            raise ValidationError(f"Failed to create log stream: {str(e)}")
 
         # Create a structured log event with searchable fields
         event_data = {
@@ -192,20 +251,33 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
         }
 
         # Create log event
-        logs_client.put_log_events(
-            logGroupName=log_group_name,
-            logStreamName=log_stream_name,
-            logEvents=[
-                {
-                    "timestamp": timestamp,
-                    "message": json.dumps(event_data)
-                }
-            ]
-        )
+        try:
+            response = logs_client.put_log_events(
+                logGroupName=log_group_name,
+                logStreamName=log_stream_name,
+                logEvents=[
+                    {
+                        "timestamp": timestamp,
+                        "message": json.dumps(event_data)
+                    }
+                ]
+            )
+            if 'rejectedLogEventsInfo' in response:
+                logger.warning(f"Some log events were rejected: {response['rejectedLogEventsInfo']}")
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"Error serializing event data: {str(e)}")
+            raise ValidationError(f"Failed to serialize data to JSON: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error putting log events: {str(e)}")
+            raise ValidationError(f"Failed to write log events: {str(e)}")
 
+    except ValidationError:
+        # Re-raise validation errors
+        raise
     except Exception as e:
         logger.error(f"Failed to write to CloudWatch Logs: {str(e)}")
-        raise
+        raise ValidationError(f"Failed to write to CloudWatch: {str(e)}")
 
 
 def query_cloudwatch_logs(
