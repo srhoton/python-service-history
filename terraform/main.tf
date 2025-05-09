@@ -6,21 +6,11 @@ provider "aws" {
   }
 }
 
-#--------------------------------------------------
-# Lambda Function
-#--------------------------------------------------
-
-data "archive_file" "lambda_package" {
-  type        = "zip"
-  source_dir  = var.source_dir
-  output_path = "${path.module}/lambda_function.zip"
-}
-
 resource "aws_lambda_function" "service_history" {
   function_name    = var.function_name
   description      = var.lambda_description
-  filename         = data.archive_file.lambda_package.output_path
-  source_code_hash = data.archive_file.lambda_package.output_base64sha256
+  filename         = "lambda_function.zip"
+  source_code_hash = filebase64sha256("lambda_function.zip")
   handler          = var.lambda_handler
   runtime          = var.lambda_runtime
   memory_size      = var.lambda_memory_size
@@ -43,26 +33,7 @@ resource "aws_lambda_function" "service_history" {
   ]
 }
 
-#--------------------------------------------------
-# CloudWatch Log Group
-#--------------------------------------------------
-
 resource "aws_cloudwatch_log_group" "lambda_logs" {
   name              = "/aws/lambda/${var.function_name}"
   retention_in_days = var.log_retention_in_days
 }
-
-#--------------------------------------------------
-# Lambda Permissions (if needed for API Gateway/AppSync)
-#--------------------------------------------------
-
-# Uncomment and configure as needed:
-/*
-resource "aws_lambda_permission" "api_gateway" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.service_history.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.service_history_api.execution_arn}"
-}
-*/
