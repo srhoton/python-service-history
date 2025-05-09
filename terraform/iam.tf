@@ -51,7 +51,7 @@ resource "aws_iam_policy" "lambda_cloudwatch_policy" {
           "logs:DescribeLogGroups"
         ]
         Effect   = "Allow"
-        Resource = "*"  # The specific log group name is retrieved from AppConfig
+        Resource = "*" # The specific log group name is retrieved from AppConfig
       }
     ]
   })
@@ -80,9 +80,9 @@ resource "aws_iam_policy" "lambda_appconfig_policy" {
         ]
         Effect = "Allow"
         Resource = [
-          "arn:aws:appconfig:${var.aws_region}:${data.aws_caller_identity.current.account_id}:application/${var.appconfig_app_id}",
-          "arn:aws:appconfig:${var.aws_region}:${data.aws_caller_identity.current.account_id}:application/${var.appconfig_app_id}/environment/${var.appconfig_env_id}",
-          "arn:aws:appconfig:${var.aws_region}:${data.aws_caller_identity.current.account_id}:application/${var.appconfig_app_id}/configurationprofile/${var.appconfig_config_profile_id}"
+          "arn:aws:appconfig:${var.aws_region}:${data.aws_caller_identity.current.account_id}:application/${aws_appconfig_application.service_history.id}",
+          "arn:aws:appconfig:${var.aws_region}:${data.aws_caller_identity.current.account_id}:application/${aws_appconfig_application.service_history.id}/environment/${aws_appconfig_environment.service_history.environment_id}",
+          "arn:aws:appconfig:${var.aws_region}:${data.aws_caller_identity.current.account_id}:application/${aws_appconfig_application.service_history.id}/configurationprofile/${aws_appconfig_configuration_profile.service_history.configuration_profile_id}"
         ]
       }
     ]
@@ -91,13 +91,5 @@ resource "aws_iam_policy" "lambda_appconfig_policy" {
 
 resource "aws_iam_role_policy_attachment" "lambda_appconfig" {
   role       = aws_iam_role.lambda_execution_role.name
-  policy_3rn = aws_iam_policy.lambda_appconfig_policy.arn
-}
-
-#--------------------------------------------------
-# Ensure Lambda role is created after AppConfig configuration
-#--------------------------------------------------
-
-resource "aws_iam_role" "lambda_execution_role" {
-  depends_on = [aws_appconfig_configuration.service_history]
+  policy_arn = aws_iam_policy.lambda_appconfig_policy.arn
 }

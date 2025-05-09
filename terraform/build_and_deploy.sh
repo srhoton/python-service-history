@@ -1,15 +1,22 @@
 #!/bin/bash
 
-# Set the source directory (default is "../src")
-SOURCE_DIR="../src"
+# This script deploys the Lambda function using Terraform
+# Note: The lambda_function.zip file is now created by Terraform's archive_file data source in main.tf
 
-# Build the Lambda ZIP file
-echo "Zipping Lambda source code..."
-zip -r9 lambda_function.zip "$SOURCE_DIR"
+# Initialize Terraform (only needed first time or when changing backends/providers)
+echo "Initializing Terraform..."
+terraform init
 
-# Check if zip was successful
+# Format Terraform files for consistency
+echo "Formatting Terraform files..."
+terraform fmt
+
+# Validate Terraform configuration
+echo "Validating Terraform configuration..."
+terraform validate
+
 if [ $? -ne 0 ]; then
-  echo "Failed to zip Lambda source code. Aborting deployment."
+  echo "Terraform validation failed. Aborting deployment."
   exit 1
 fi
 
