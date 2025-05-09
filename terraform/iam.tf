@@ -59,7 +59,7 @@ resource "aws_iam_policy" "lambda_cloudwatch_policy" {
 
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = aws_iam_policy.lambda_cloud
+  policy_arn = aws_iam_policy.lambda_cloudwatch_policy.arn
 }
 
 #--------------------------------------------------
@@ -91,7 +91,7 @@ resource "aws_iam_policy" "lambda_appconfig_policy" {
 
 resource "aws_iam_role_policy_attachment" "lambda_appconfig" {
   role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = aws_iam_policy.lambda_appconfig_policy.arn
+  policy_3rn = aws_iam_policy.lambda_appconfig_policy.arn
 }
 
 #--------------------------------------------------

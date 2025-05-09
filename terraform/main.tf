@@ -13,7 +13,7 @@ resource "aws_lambda_function" "service_history" {
   source_code_hash = filebase64sha256("lambda_function.zip")
   handler          = var.lambda_handler
   runtime          = var.lambda_runtime
-  memory_size      = var.lambda_memory
+  memory_size      = var.lambda_memory_size
   timeout          = var.lambda_timeout
   role             = aws_iam_role.lambda_execution_role.arn
 
