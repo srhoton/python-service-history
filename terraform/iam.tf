@@ -59,7 +59,7 @@ resource "aws_iam_policy" "lambda_cloudwatch_policy" {
 
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = aws_iam_policy.lambda_cloudwatch_policy.arn
+  policy_arn = aws_iam_policy.lambda_cloud
 }
 
 #--------------------------------------------------
@@ -92,4 +92,12 @@ resource "aws_iam_policy" "lambda_appconfig_policy" {
 resource "aws_iam_role_policy_attachment" "lambda_appconfig" {
   role       = aws_iam_role.lambda_execution_role.name
   policy_arn = aws_iam_policy.lambda_appconfig_policy.arn
+}
+
+#--------------------------------------------------
+# Ensure Lambda role is created after AppConfig configuration
+#--------------------------------------------------
+
+resource "aws_iam_role" "lambda_execution_role" {
+  depends_on = [aws_appconfig_configuration.service_history]
 }

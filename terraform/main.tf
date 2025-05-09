@@ -29,7 +29,8 @@ resource "aws_lambda_function" "service_history" {
   depends_on = [
     aws_cloudwatch_log_group.lambda_logs,
     aws_iam_role_policy_attachment.lambda_logs,
-    aws_iam_role_policy_attachment.lambda_appconfig
+    aws_iam_role_policy_attachment.lambda_appconfig,
+    aws_appconfig_configuration.service_history
   ]
 }
 
