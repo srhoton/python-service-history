@@ -195,6 +195,102 @@ def validate_read_input(query_params: Dict[str, str], id_value: str) -> Tuple[da
     return start_time, end_time
 
 
+def _validate_cloudwatch_inputs(log_group_name: str, id_value: str, data: Dict[str, Any]) -> None:
+    """Validate inputs for CloudWatch logging.
+
+    Args:
+        log_group_name: The CloudWatch log group name
+        id_value: The ID value
+        data: The data to write
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    if not log_group_name:
+        raise ValidationError("Log group name cannot be empty")
+        
+    if not id_value:
+        raise ValidationError("ID value cannot be empty")
+        
+    if data is None:
+        raise ValidationError("Data cannot be None")
+
+
+def _ensure_log_group_exists(log_group_name: str) -> None:
+    """Ensure CloudWatch log group exists, creating it if needed.
+
+    Args:
+        log_group_name: The CloudWatch log group name
+
+    Raises:
+        ValidationError: If log group creation fails
+    """
+    try:
+        logs_client.create_log_group(logGroupName=log_group_name)
+        logger.info(f"Created log group: {log_group_name}")
+    except logs_client.exceptions.ResourceAlreadyExistsException:
+        pass
+    except Exception as e:
+        logger.error(f"Error creating log group '{log_group_name}': {str(e)}")
+        raise ValidationError(f"Failed to create log group: {str(e)}")
+
+
+def _create_log_stream(log_group_name: str, log_stream_name: str) -> None:
+    """Create a CloudWatch log stream.
+
+    Args:
+        log_group_name: The CloudWatch log group name
+        log_stream_name: The log stream name
+
+    Raises:
+        ValidationError: If log stream creation fails
+    """
+    try:
+        logs_client.create_log_stream(
+            logGroupName=log_group_name,
+            logStreamName=log_stream_name
+        )
+    except logs_client.exceptions.ResourceAlreadyExistsException:
+        pass
+    except Exception as e:
+        logger.error(f"Error creating log stream '{log_stream_name}': {str(e)}")
+        raise ValidationError(f"Failed to create log stream: {str(e)}")
+
+
+def _put_log_event(log_group_name: str, log_stream_name: str, timestamp: int, event_data: Dict[str, Any]) -> None:
+    """Write log event to CloudWatch.
+
+    Args:
+        log_group_name: The CloudWatch log group name
+        log_stream_name: The log stream name
+        timestamp: Event timestamp in milliseconds
+        event_data: Event data to log
+
+    Raises:
+        ValidationError: If putting log event fails
+    """
+    try:
+        response = logs_client.put_log_events(
+            logGroupName=log_group_name,
+            logStreamName=log_stream_name,
+            logEvents=[
+                {
+                    "timestamp": timestamp,
+                    "message": json.dumps(event_data)
+                }
+            ]
+        )
+        if 'rejectedLogEventsInfo' in response:
+            logger.warning(f"Some log events were rejected: {response['rejectedLogEventsInfo']}")
+            
+    except json.JSONDecodeError as e:
+        logger.error(f"Error serializing event data: {str(e)}")
+        raise ValidationError(f"Failed to serialize data to JSON: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error putting log events: {str(e)}")
+        raise ValidationError(f"Failed to write log events: {str(e)}")
+
+
 def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]) -> None:
     """Write data to CloudWatch Logs.
 
@@ -209,39 +305,15 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
     """
     try:
         # Validate inputs
-        if not log_group_name:
-            raise ValidationError("Log group name cannot be empty")
-            
-        if not id_value:
-            raise ValidationError("ID value cannot be empty")
-            
-        if data is None:
-            raise ValidationError("Data cannot be None")
+        _validate_cloudwatch_inputs(log_group_name, id_value, data)
 
         # Ensure log group exists
-        try:
-            logs_client.create_log_group(logGroupName=log_group_name)
-            logger.info(f"Created log group: {log_group_name}")
-        except logs_client.exceptions.ResourceAlreadyExistsException:
-            pass
-        except Exception as e:
-            logger.error(f"Error creating log group '{log_group_name}': {str(e)}")
-            raise ValidationError(f"Failed to create log group: {str(e)}")
+        _ensure_log_group_exists(log_group_name)
 
         # Create a log stream with the ID and timestamp
         timestamp = int(time.time() * 1000)
         log_stream_name = f"{id_value}/{timestamp}"
-
-        try:
-            logs_client.create_log_stream(
-                logGroupName=log_group_name,
-                logStreamName=log_stream_name
-            )
-        except logs_client.exceptions.ResourceAlreadyExistsException:
-            pass
-        except Exception as e:
-            logger.error(f"Error creating log stream '{log_stream_name}': {str(e)}")
-            raise ValidationError(f"Failed to create log stream: {str(e)}")
+        _create_log_stream(log_group_name, log_stream_name)
 
         # Create a structured log event with searchable fields
         event_data = {
@@ -250,27 +322,8 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
             **data
         }
 
-        # Create log event
-        try:
-            response = logs_client.put_log_events(
-                logGroupName=log_group_name,
-                logStreamName=log_stream_name,
-                logEvents=[
-                    {
-                        "timestamp": timestamp,
-                        "message": json.dumps(event_data)
-                    }
-                ]
-            )
-            if 'rejectedLogEventsInfo' in response:
-                logger.warning(f"Some log events were rejected: {response['rejectedLogEventsInfo']}")
-                
-        except json.JSONDecodeError as e:
-            logger.error(f"Error serializing event data: {str(e)}")
-            raise ValidationError(f"Failed to serialize data to JSON: {str(e)}")
-        except Exception as e:
-            logger.error(f"Error putting log events: {str(e)}")
-            raise ValidationError(f"Failed to write log events: {str(e)}")
+        # Write the log event
+        _put_log_event(log_group_name, log_stream_name, timestamp, event_data)
 
     except ValidationError:
         # Re-raise validation errors
