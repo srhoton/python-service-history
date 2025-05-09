@@ -28,6 +28,9 @@ dev = [
     "pre-commit",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py39"
