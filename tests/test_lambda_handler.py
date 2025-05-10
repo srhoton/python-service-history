@@ -73,9 +73,7 @@ class TestHelperFunctions:
             extract_id_from_path("")
 
     def test_get_log_group_name(
-        self,
-        mock_appconfig: MagicMock,
-        set_environment_variables: None
+        self, mock_appconfig: MagicMock, set_environment_variables: None
     ) -> None:
         """Test retrieval of log group name from AppConfig."""
         # Test successful retrieval
@@ -112,8 +110,7 @@ class TestHelperFunctions:
         """Test validation of read input parameters."""
         # Test with valid times
         start, end = validate_read_input(
-            {"start": "2023-01-01T00:00:00Z", "end": "2023-01-02T00:00:00Z"},
-            "test-id"
+            {"start": "2023-01-01T00:00:00Z", "end": "2023-01-02T00:00:00Z"}, "test-id"
         )
         assert start == parser.parse("2023-01-01T00:00:00Z")
         assert end == parser.parse("2023-01-02T00:00:00Z")
@@ -146,9 +143,7 @@ class TestCloudWatchOperations:
         mock_logs_client = MagicMock()
 
         # Set up the mock to return a sequence number for put_log_events
-        mock_logs_client.put_log_events.return_value = {
-            "nextSequenceToken": "next-token"
-        }
+        mock_logs_client.put_log_events.return_value = {"nextSequenceToken": "next-token"}
 
         # Set up a timestamp for consistent testing
         timestamp = int(time.time() * 1000)
@@ -157,34 +152,30 @@ class TestCloudWatchOperations:
         with patch("src.lambda_function.lambda_handler.logs_client", mock_logs_client):
             with patch("src.lambda_function.lambda_handler.int") as mock_int:
                 mock_int.return_value = timestamp
-                write_to_cloudwatch(
-                    self.log_group_name,
-                    self.id_value,
-                    test_data
-                )
+                write_to_cloudwatch(self.log_group_name, self.id_value, test_data)
 
         # Verify create_log_stream was called with correct arguments
         mock_logs_client.create_log_stream.assert_called_once()
         call_args = mock_logs_client.create_log_stream.call_args[1]
-        assert call_args['logGroupName'] == self.log_group_name
-        assert self.id_value in call_args['logStreamName']
+        assert call_args["logGroupName"] == self.log_group_name
+        assert self.id_value in call_args["logStreamName"]
 
         # Verify that put_log_events was called with correct arguments
         mock_logs_client.put_log_events.assert_called_once()
         call_args = mock_logs_client.put_log_events.call_args[1]
-        assert call_args['logGroupName'] == self.log_group_name
-        assert self.id_value in call_args['logStreamName']
+        assert call_args["logGroupName"] == self.log_group_name
+        assert self.id_value in call_args["logStreamName"]
 
         # Check the log event content
-        log_events = call_args['logEvents']
+        log_events = call_args["logEvents"]
         assert len(log_events) == 1
-        assert log_events[0]['timestamp'] == timestamp
+        assert log_events[0]["timestamp"] == timestamp
 
         # Verify the message content
-        event_data = json.loads(log_events[0]['message'])
-        assert event_data['id'] == self.id_value
-        assert event_data['message'] == test_data['message']
-        assert event_data['value'] == test_data['value']
+        event_data = json.loads(log_events[0]["message"])
+        assert event_data["id"] == self.id_value
+        assert event_data["message"] == test_data["message"]
+        assert event_data["value"] == test_data["value"]
 
     def test_query_cloudwatch_logs(self) -> None:
         """Test querying CloudWatch Logs."""
@@ -192,9 +183,7 @@ class TestCloudWatchOperations:
         mock_logs_client = MagicMock()
 
         # Set up the mock to return a query ID and then results
-        mock_logs_client.start_query.return_value = {
-            "queryId": "test-query-id"
-        }
+        mock_logs_client.start_query.return_value = {"queryId": "test-query-id"}
 
         mock_logs_client.get_query_results.return_value = {
             "status": "Complete",
@@ -202,9 +191,9 @@ class TestCloudWatchOperations:
                 [
                     {"field": "@timestamp", "value": "2023-01-01T12:00:00Z"},
                     {"field": "id", "value": self.id_value},
-                    {"field": "message", "value": "Query test"}
+                    {"field": "message", "value": "Query test"},
                 ]
-            ]
+            ],
         }
 
         # Test the query function
@@ -212,25 +201,20 @@ class TestCloudWatchOperations:
             start_time = datetime.now() - timedelta(hours=1)
             end_time = datetime.now()
             results = query_cloudwatch_logs(
-                self.log_group_name,
-                self.id_value,
-                start_time,
-                end_time
+                self.log_group_name, self.id_value, start_time, end_time
             )
 
         # Verify start_query was called with correct arguments
         mock_logs_client.start_query.assert_called_once()
         call_args = mock_logs_client.start_query.call_args[1]
-        assert call_args['logGroupName'] == self.log_group_name
-        assert 'startTime' in call_args
-        assert 'endTime' in call_args
-        assert 'queryString' in call_args
-        assert self.id_value in call_args['queryString']
+        assert call_args["logGroupName"] == self.log_group_name
+        assert "startTime" in call_args
+        assert "endTime" in call_args
+        assert "queryString" in call_args
+        assert self.id_value in call_args["queryString"]
 
         # Verify get_query_results was called
-        mock_logs_client.get_query_results.assert_called_once_with(
-            queryId="test-query-id"
-        )
+        mock_logs_client.get_query_results.assert_called_once_with(queryId="test-query-id")
 
         # Verify results were correctly processed
         assert len(results) == 1
@@ -245,18 +229,13 @@ class TestEventHandlers:
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.write_to_cloudwatch")
     def test_handle_create_event_api_gateway(
-        self,
-        mock_write: MagicMock,
-        mock_get_log_group: MagicMock
+        self, mock_write: MagicMock, mock_get_log_group: MagicMock
     ) -> None:
         """Test handling create event from API Gateway."""
         mock_get_log_group.return_value = "test-log-group"
 
         # Test with API Gateway event
-        api_event = {
-            "path": "/service/test-id",
-            "body": json.dumps({"message": "Test message"})
-        }
+        api_event = {"path": "/service/test-id", "body": json.dumps({"message": "Test message"})}
 
         response = handle_create_event(api_event)
 
@@ -265,32 +244,20 @@ class TestEventHandlers:
         assert json.loads(response["body"])["success"] is True
         assert json.loads(response["body"])["id"] == "test-id"
 
-        mock_write.assert_called_once_with(
-            "test-log-group",
-            "test-id",
-            {"message": "Test message"}
-        )
+        mock_write.assert_called_once_with("test-log-group", "test-id", {"message": "Test message"})
 
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.write_to_cloudwatch")
     def test_handle_create_event_appsync(
-        self,
-        mock_write: MagicMock,
-        mock_get_log_group: MagicMock
+        self, mock_write: MagicMock, mock_get_log_group: MagicMock
     ) -> None:
         """Test handling create event from AppSync."""
         mock_get_log_group.return_value = "test-log-group"
 
         # Test with AppSync event
         appsync_event = {
-            "info": {
-                "fieldName": "createServiceEvent",
-                "parentTypeName": "Mutation"
-            },
-            "arguments": {
-                "id": "test-id",
-                "data": {"message": "Test AppSync message"}
-            }
+            "info": {"fieldName": "createServiceEvent", "parentTypeName": "Mutation"},
+            "arguments": {"id": "test-id", "data": {"message": "Test AppSync message"}},
         }
 
         response = handle_create_event(appsync_event)
@@ -300,23 +267,19 @@ class TestEventHandlers:
         assert json.loads(response["body"])["success"] is True
 
         mock_write.assert_called_once_with(
-            "test-log-group",
-            "test-id",
-            {"message": "Test AppSync message"}
+            "test-log-group", "test-id", {"message": "Test AppSync message"}
         )
 
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.query_cloudwatch_logs")
     def test_handle_read_event_api_gateway(
-        self,
-        mock_query: MagicMock,
-        mock_get_log_group: MagicMock
+        self, mock_query: MagicMock, mock_get_log_group: MagicMock
     ) -> None:
         """Test handling read event from API Gateway."""
         mock_get_log_group.return_value = "test-log-group"
         mock_query.return_value = [
             {"id": "test-id", "message": "Test record 1"},
-            {"id": "test-id", "message": "Test record 2"}
+            {"id": "test-id", "message": "Test record 2"},
         ]
 
         # Test with API Gateway event
@@ -324,8 +287,8 @@ class TestEventHandlers:
             "path": "/service/test-id",
             "queryStringParameters": {
                 "start": "2023-01-01T00:00:00Z",
-                "end": "2023-01-02T00:00:00Z"
-            }
+                "end": "2023-01-02T00:00:00Z",
+            },
         }
 
         response = handle_read_event(api_event)
@@ -343,9 +306,7 @@ class TestEventHandlers:
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.query_cloudwatch_logs")
     def test_handle_read_event_appsync(
-        self,
-        mock_query: MagicMock,
-        mock_get_log_group: MagicMock
+        self, mock_query: MagicMock, mock_get_log_group: MagicMock
     ) -> None:
         """Test handling read event from AppSync."""
         mock_get_log_group.return_value = "test-log-group"
@@ -353,15 +314,12 @@ class TestEventHandlers:
 
         # Test with AppSync event
         appsync_event = {
-            "info": {
-                "fieldName": "getServiceEvents",
-                "parentTypeName": "Query"
-            },
+            "info": {"fieldName": "getServiceEvents", "parentTypeName": "Query"},
             "arguments": {
                 "id": "test-id",
                 "start": "2023-01-01T00:00:00Z",
-                "end": "2023-01-02T00:00:00Z"
-            }
+                "end": "2023-01-02T00:00:00Z",
+            },
         }
 
         response = handle_read_event(appsync_event)
@@ -379,11 +337,7 @@ class TestLambdaHandler:
 
     @patch("src.lambda_function.lambda_handler.handle_create_event")
     @patch("src.lambda_function.lambda_handler.handle_read_event")
-    def test_lambda_handler_api_gateway(
-        self,
-        mock_read: MagicMock,
-        mock_create: MagicMock
-    ) -> None:
+    def test_lambda_handler_api_gateway(self, mock_read: MagicMock, mock_create: MagicMock) -> None:
         """Test lambda_handler with API Gateway events."""
         # Setup mock return values
         mock_create.return_value = {"statusCode": 200, "body": json.dumps({"success": True})}
@@ -415,23 +369,14 @@ class TestLambdaHandler:
 
     @patch("src.lambda_function.lambda_handler.handle_create_event")
     @patch("src.lambda_function.lambda_handler.handle_read_event")
-    def test_lambda_handler_appsync(
-        self,
-        mock_read: MagicMock,
-        mock_create: MagicMock
-    ) -> None:
+    def test_lambda_handler_appsync(self, mock_read: MagicMock, mock_create: MagicMock) -> None:
         """Test lambda_handler with AppSync events."""
         # Setup mock return values
         mock_create.return_value = {"statusCode": 200, "body": json.dumps({"success": True})}
         mock_read.return_value = {"statusCode": 200, "body": json.dumps({"records": []})}
 
         # Test mutation (POST)
-        mutation_event = {
-            "info": {
-                "fieldName": "createServiceEvent",
-                "parentTypeName": "Mutation"
-            }
-        }
+        mutation_event = {"info": {"fieldName": "createServiceEvent", "parentTypeName": "Mutation"}}
         response = lambda_handler(mutation_event, {})
         assert response["statusCode"] == 200
         mock_create.assert_called_once_with(mutation_event)
@@ -440,12 +385,7 @@ class TestLambdaHandler:
         mock_read.reset_mock()
 
         # Test query (GET)
-        query_event = {
-            "info": {
-                "fieldName": "getServiceEvents",
-                "parentTypeName": "Query"
-            }
-        }
+        query_event = {"info": {"fieldName": "getServiceEvents", "parentTypeName": "Query"}}
         response = lambda_handler(query_event, {})
         assert response["statusCode"] == 200
         mock_read.assert_called_once_with(query_event)
