@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from dateutil import parser
 
-# Import the module, not just the functions
+# Import the module for patching
+import src.lambda_function.lambda_handler as lambda_handler_module
 from src.lambda_function.lambda_handler import (
     ValidationError,
     extract_id_from_path,
@@ -98,7 +99,7 @@ class TestHelperFunctions:
         validate_create_input({"key": "value"})
         validate_create_input({"multiple": "values", "number": 123})
 
-        # Empty dict is valid
+        # Empty dict is valid (if this is expected behavior)
         validate_create_input({})
 
         # Invalid inputs
@@ -149,7 +150,7 @@ class TestCloudWatchOperations:
         # Set up a timestamp for consistent testing
         timestamp = int(time.time() * 1000)
 
-        # Test the write function
+        # Test the write function - use the module path for patching
         with patch("src.lambda_function.lambda_handler.logs_client", mock_logs_client):
             with patch("src.lambda_function.lambda_handler.int") as mock_int:
                 mock_int.return_value = timestamp
@@ -394,7 +395,7 @@ class TestLambdaHandler:
     def test_lambda_handler_error_handling(self) -> None:
         """Test lambda_handler error handling."""
         # Test with ValidationError
-        with patch("src.lambda_function.lambda_handler.handle_create_event") as mock_create:
+        with patch.object(lambda_handler_module, "handle_create_event") as mock_create:
             mock_create.side_effect = ValidationError("Test validation error", 400)
 
             event = {"httpMethod": "POST", "path": "/service/test-id"}
@@ -404,7 +405,7 @@ class TestLambdaHandler:
             assert "Test validation error" in response["body"]
 
         # Test with unexpected exception
-        with patch("src.lambda_function.lambda_handler.handle_create_event") as mock_create:
+        with patch.object(lambda_handler_module, "handle_create_event") as mock_create:
             mock_create.side_effect = Exception("Unexpected error")
 
             event = {"httpMethod": "POST", "path": "/service/test-id"}
