@@ -50,9 +50,12 @@ select = [
     "A",  # flake8-builtins
     "RUF", # Ruff-specific rules
 ]
-ignore = ["ANN101", "ANN102"]
+ignore = [
+    "S101",  # Allow assert in tests
+    "B017"   # Allow pytest.raises(Exception)
+]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.format]
