@@ -465,7 +465,7 @@ def handle_read_event(event: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Extract path and query parameters based on event source
     path = ""
-    query_params = {}
+    query_params: Dict[str, str] = {}
 
     # Handle API Gateway event
     if "path" in event:

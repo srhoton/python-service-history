@@ -26,6 +26,7 @@ dev = [
     "moto",
     "pytest-mock",
     "pre-commit",
+    "types-python-dateutil",
 ]
 
 [tool.hatch.build.targets.wheel]
