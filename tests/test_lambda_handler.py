@@ -178,9 +178,10 @@ class TestCloudWatchOperations:
             start_time = datetime.now() - timedelta(hours=1)
             end_time = datetime.now()
             # Use the results to avoid the unused variable warning
-            assert query_cloudwatch_logs(
-                self.log_group_name, self.id_value, start_time, end_time
-            ) is not None
+            assert (
+                query_cloudwatch_logs(self.log_group_name, self.id_value, start_time, end_time)
+                is not None
+            )
 
 
 class TestEventHandlers:
