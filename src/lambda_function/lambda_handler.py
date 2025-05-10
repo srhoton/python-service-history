@@ -424,15 +424,27 @@ def handle_create_event(event: Dict[str, Any]) -> Dict[str, Any]:
                 )
             except json.JSONDecodeError as e:
                 raise ValidationError("Invalid JSON in request body") from e
+        # Extract ID from path for API Gateway events
+        id_value = extract_id_from_path(path)
     # Handle AppSync event
     elif "info" in event and "fieldName" in event["info"]:
         path = event["info"].get("fieldName", "")
-        body = event.get("arguments", {})
+        arguments = event.get("arguments", {})
+        # Extract ID from arguments for AppSync events
+        if "id" in arguments:
+            id_value = arguments.pop("id")
+        else:
+            try:
+                id_value = extract_id_from_path(path)
+            except ValidationError:
+                raise ValidationError("ID not found in AppSync event")
+        
+        # Use the 'data' field from arguments if it exists, otherwise use arguments
+        body = arguments.get("data", arguments)
     else:
         raise ValidationError("Unsupported event format")
 
-    # Extract and validate ID
-    id_value = extract_id_from_path(path)
+    # Validate input
     validate_create_input(body)
 
     # Get log group name from AppConfig
@@ -471,15 +483,24 @@ def handle_read_event(event: Dict[str, Any]) -> Dict[str, Any]:
     if "path" in event:
         path = event["path"]
         query_params = event.get("queryStringParameters", {}) or {}
+        # Extract ID from path for API Gateway events
+        id_value = extract_id_from_path(path)
     # Handle AppSync event
     elif "info" in event and "fieldName" in event["info"]:
         path = event["info"].get("fieldName", "")
-        query_params = event.get("arguments", {})
+        query_params = event.get("arguments", {}).copy()
+        # Extract ID from arguments for AppSync events
+        if "id" in query_params:
+            id_value = query_params.pop("id")
+        else:
+            try:
+                id_value = extract_id_from_path(path)
+            except ValidationError:
+                raise ValidationError("ID not found in AppSync event")
     else:
         raise ValidationError("Unsupported event format")
 
-    # Extract and validate ID
-    id_value = extract_id_from_path(path)
+    # Validate input and get time range
     start_time, end_time = validate_read_input(query_params, id_value)
 
     # Get log group name from AppConfig
@@ -535,11 +556,11 @@ def lambda_handler(event: Dict[str, Any], context: object) -> Dict[str, Any]:
                 method = "GET"  # Treat queries as GET
 
         # Process based on method
-        if method == "POST" or method == "PUT":
+        if method == "POST":
             return handle_create_event(event)
         elif method == "GET":
             return handle_read_event(event)
-        elif method == "DELETE" or method == "PATCH":
+        elif method == "DELETE" or method == "PATCH" or method == "PUT":
             return {
                 "statusCode": 405,
                 "body": json.dumps(
