@@ -45,7 +45,7 @@ select = [
     "D",  # pydocstyle
     "ANN", # flake8-annotations
     "S",  # flake8-bandit
-    "C4", # flake8-comprehensions
+    "C4",  # flake8-comprehensions
     "B",  # flake8-bugbear
     "A",  # flake8-builtins
     "RUF", # Ruff-specific rules

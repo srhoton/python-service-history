@@ -34,7 +34,7 @@ LOG_GROUP_CONFIG_KEY = 'logGroup'
 class ValidationError(Exception):
     """Exception raised for input validation errors."""
 
-    def __init__(self, message: str, status_code: int = 400):
+    def __init__(self, message: str, status_code: int = 400) -> None:
         """Initialize ValidationError.
 
         Args:
@@ -63,28 +63,30 @@ def get_log_group_name() -> str:
             Configuration=CONFIG_PROFILE_ID,
             ClientId='ServiceHistoryLambda'
         )
-        
+
         try:
             config_data = json.loads(response['Content'].read())
         except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid AppConfig configuration format: {str(e)}")
-            raise ValidationError(f"Invalid configuration format: {str(e)}")
-            
+            logger.error(f"Invalid AppConfig configuration format: {e!s}")
+            raise ValidationError(f"Invalid configuration format: {e!s}") from e
+
         log_group_name = config_data.get(LOG_GROUP_CONFIG_KEY)
 
         if not log_group_name:
             raise ValidationError(f"Configuration missing '{LOG_GROUP_CONFIG_KEY}' key")
-        
+
         if not isinstance(log_group_name, str):
-            raise ValidationError(f"Invalid log group name type: expected string, got {type(log_group_name).__name__}")
+            raise ValidationError(
+                f"Invalid log group name type: expected string, got {type(log_group_name).__name__}"
+            )
 
         return log_group_name
     except ValidationError:
         # Re-raise validation errors
         raise
     except Exception as e:
-        logger.error(f"Failed to retrieve AppConfig configuration: {str(e)}")
-        raise ValidationError(f"Could not retrieve log group configuration: {str(e)}")
+        logger.error(f"Failed to retrieve AppConfig configuration: {e!s}")
+        raise ValidationError(f"Could not retrieve log group configuration: {e!s}") from e
 
 
 def extract_id_from_path(path: str) -> str:
@@ -101,26 +103,28 @@ def extract_id_from_path(path: str) -> str:
     """
     try:
         if not isinstance(path, str):
-            raise ValidationError(f"Invalid path format: expected string, got {type(path).__name__}")
-        
+            raise ValidationError(
+                f"Invalid path format: expected string, got {type(path).__name__}"
+            )
+
         if not path:
             raise ValidationError("Empty path provided")
-            
+
         match = re.search(r'/([^/]+)$', path)
         if not match:
             raise ValidationError("ID not found in request path")
-        
+
         id_value = match.group(1)
         if not id_value:
             raise ValidationError("Extracted ID is empty")
-            
+
         return id_value
     except ValidationError:
         # Re-raise validation errors
         raise
     except Exception as e:
-        logger.error(f"Error extracting ID from path '{path}': {str(e)}")
-        raise ValidationError(f"Failed to extract ID from path: {str(e)}")
+        logger.error(f"Error extracting ID from path '{path}': {e!s}")
+        raise ValidationError(f"Failed to extract ID from path: {e!s}") from e
 
 
 def validate_create_input(body: Dict[str, Any]) -> None:
@@ -135,19 +139,19 @@ def validate_create_input(body: Dict[str, Any]) -> None:
     try:
         if body is None:
             raise ValidationError("Request body cannot be None")
-            
+
         if not isinstance(body, dict):
             raise ValidationError(f"Request body must be a JSON object, got {type(body).__name__}")
 
         if not body:
             raise ValidationError("Request body cannot be empty")
-            
+
     except ValidationError:
         # Re-raise validation errors
         raise
     except Exception as e:
-        logger.error(f"Error validating create input: {str(e)}")
-        raise ValidationError(f"Input validation failed: {str(e)}")
+        logger.error(f"Error validating create input: {e!s}")
+        raise ValidationError(f"Input validation failed: {e!s}") from e
 
 
 def validate_read_input(query_params: Dict[str, str], id_value: str) -> Tuple[datetime, datetime]:
@@ -172,14 +176,14 @@ def validate_read_input(query_params: Dict[str, str], id_value: str) -> Tuple[da
     if 'start' in query_params:
         try:
             start_time = parser.parse(query_params['start'])
-        except ValueError:
-            raise ValidationError("Invalid start time format. Expected ISO 8601 format.")
+        except ValueError as e:
+            raise ValidationError("Invalid start time format. Expected ISO 8601 format.") from e
 
     if 'end' in query_params:
         try:
             end_time = parser.parse(query_params['end'])
-        except ValueError:
-            raise ValidationError("Invalid end time format. Expected ISO 8601 format.")
+        except ValueError as e:
+            raise ValidationError("Invalid end time format. Expected ISO 8601 format.") from e
 
     # Default to last hour if not specified
     if start_time is None:
@@ -208,10 +212,10 @@ def _validate_cloudwatch_inputs(log_group_name: str, id_value: str, data: Dict[s
     """
     if not log_group_name:
         raise ValidationError("Log group name cannot be empty")
-        
+
     if not id_value:
         raise ValidationError("ID value cannot be empty")
-        
+
     if data is None:
         raise ValidationError("Data cannot be None")
 
@@ -231,8 +235,8 @@ def _ensure_log_group_exists(log_group_name: str) -> None:
     except logs_client.exceptions.ResourceAlreadyExistsException:
         pass
     except Exception as e:
-        logger.error(f"Error creating log group '{log_group_name}': {str(e)}")
-        raise ValidationError(f"Failed to create log group: {str(e)}")
+        logger.error(f"Error creating log group '{log_group_name}': {e!s}")
+        raise ValidationError(f"Failed to create log group: {e!s}") from e
 
 
 def _create_log_stream(log_group_name: str, log_stream_name: str) -> None:
@@ -253,11 +257,16 @@ def _create_log_stream(log_group_name: str, log_stream_name: str) -> None:
     except logs_client.exceptions.ResourceAlreadyExistsException:
         pass
     except Exception as e:
-        logger.error(f"Error creating log stream '{log_stream_name}': {str(e)}")
-        raise ValidationError(f"Failed to create log stream: {str(e)}")
+        logger.error(f"Error creating log stream '{log_stream_name}': {e!s}")
+        raise ValidationError(f"Failed to create log stream: {e!s}") from e
 
 
-def _put_log_event(log_group_name: str, log_stream_name: str, timestamp: int, event_data: Dict[str, Any]) -> None:
+def _put_log_event(
+    log_group_name: str,
+    log_stream_name: str,
+    timestamp: int,
+    event_data: Dict[str, Any]
+) -> None:
     """Write log event to CloudWatch.
 
     Args:
@@ -282,13 +291,13 @@ def _put_log_event(log_group_name: str, log_stream_name: str, timestamp: int, ev
         )
         if 'rejectedLogEventsInfo' in response:
             logger.warning(f"Some log events were rejected: {response['rejectedLogEventsInfo']}")
-            
+
     except json.JSONDecodeError as e:
-        logger.error(f"Error serializing event data: {str(e)}")
-        raise ValidationError(f"Failed to serialize data to JSON: {str(e)}")
+        logger.error(f"Error serializing event data: {e!s}")
+        raise ValidationError(f"Failed to serialize data to JSON: {e!s}") from e
     except Exception as e:
-        logger.error(f"Error putting log events: {str(e)}")
-        raise ValidationError(f"Failed to write log events: {str(e)}")
+        logger.error(f"Error putting log events: {e!s}")
+        raise ValidationError(f"Failed to write log events: {e!s}") from e
 
 
 def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]) -> None:
@@ -329,8 +338,8 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
         # Re-raise validation errors
         raise
     except Exception as e:
-        logger.error(f"Failed to write to CloudWatch Logs: {str(e)}")
-        raise ValidationError(f"Failed to write to CloudWatch: {str(e)}")
+        logger.error(f"Failed to write to CloudWatch Logs: {e!s}")
+        raise ValidationError(f"Failed to write to CloudWatch: {e!s}") from e
 
 
 def query_cloudwatch_logs(
@@ -359,7 +368,10 @@ def query_cloudwatch_logs(
         end_time_ms = int(end_time.timestamp() * 1000)
 
         # Create a query that filters by the ID
-        query = f'fields @timestamp, @message | filter @message like "{id_value}" | sort @timestamp desc'
+        query = (
+            f'fields @timestamp, @message | filter @message like "{id_value}" | '
+            f'sort @timestamp desc'
+        )
 
         # Start query
         start_query_response = logs_client.start_query(
@@ -400,7 +412,7 @@ def query_cloudwatch_logs(
         return results
 
     except Exception as e:
-        logger.error(f"Failed to query CloudWatch Logs: {str(e)}")
+        logger.error(f"Failed to query CloudWatch Logs: {e!s}")
         raise
 
 
@@ -425,9 +437,13 @@ def handle_create_event(event: Dict[str, Any]) -> Dict[str, Any]:
         path = event['path']
         if 'body' in event:
             try:
-                body = json.loads(event['body']) if isinstance(event['body'], str) else event['body']
-            except json.JSONDecodeError:
-                raise ValidationError("Invalid JSON in request body")
+                body = (
+                    json.loads(event['body'])
+                    if isinstance(event['body'], str)
+                    else event['body']
+                )
+            except json.JSONDecodeError as e:
+                raise ValidationError("Invalid JSON in request body") from e
     # Handle AppSync event
     elif 'info' in event and 'fieldName' in event['info']:
         path = event['info'].get('fieldName', '')
@@ -512,7 +528,10 @@ def handle_read_event(event: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def lambda_handler(
+    event: Dict[str, Any],
+    context: object
+) -> Dict[str, Any]:
     """AWS Lambda handler function.
 
     Args:
@@ -551,7 +570,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return {
                 "statusCode": 405,
                 "body": json.dumps({
-                    "message": "Method not allowed. Update and Delete operations are not supported.",
+                    "message": "Method not allowed. Update and Delete operations are not "
+                               "supported.",
                     "success": False
                 }),
                 "headers": {
@@ -582,7 +602,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
         }
     except Exception as e:
-        logger.error(f"Unhandled exception: {str(e)}")
+        logger.error(f"Unhandled exception: {e!s}")
         return {
             "statusCode": 500,
             "body": json.dumps({
