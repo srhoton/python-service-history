@@ -26,7 +26,7 @@ from src.lambda_function.lambda_handler import (
 @pytest.fixture
 def mock_appconfig() -> MagicMock:
     """Set up mock AppConfig client for testing.
-    
+
     Returns:
         Mock AppConfig client.
     """
@@ -43,7 +43,7 @@ def mock_appconfig() -> MagicMock:
 @pytest.fixture
 def set_environment_variables() -> None:
     """Set up environment variables for testing.
-    
+
     Sets required environment variables and cleans them up after test.
     """
     os.environ["APPCONFIG_APP_ID"] = "TestApp"
@@ -73,8 +73,8 @@ class TestHelperFunctions:
             extract_id_from_path("")
 
     def test_get_log_group_name(
-        self, 
-        mock_appconfig: MagicMock, 
+        self,
+        mock_appconfig: MagicMock,
         set_environment_variables: None
     ) -> None:
         """Test retrieval of log group name from AppConfig."""
@@ -98,10 +98,10 @@ class TestHelperFunctions:
         # Valid inputs
         validate_create_input({"key": "value"})
         validate_create_input({"multiple": "values", "number": 123})
-        
+
         # Empty dict is valid
         validate_create_input({})
-        
+
         # Invalid inputs
         with pytest.raises(ValidationError):
             validate_create_input("not a dict")  # type: ignore
@@ -141,18 +141,18 @@ class TestCloudWatchOperations:
     def test_write_to_cloudwatch(self) -> None:
         """Test writing data to CloudWatch Logs."""
         test_data = {"message": "Test message", "value": 123}
-        
+
         # Mock the CloudWatch Logs client
         mock_logs_client = MagicMock()
-        
+
         # Set up the mock to return a sequence number for put_log_events
         mock_logs_client.put_log_events.return_value = {
             "nextSequenceToken": "next-token"
         }
-        
+
         # Set up a timestamp for consistent testing
         timestamp = int(time.time() * 1000)
-        
+
         # Test the write function
         with patch("src.lambda_function.lambda_handler.logs_client", mock_logs_client):
             with patch("src.lambda_function.lambda_handler.int") as mock_int:
@@ -162,24 +162,24 @@ class TestCloudWatchOperations:
                     self.id_value,
                     test_data
                 )
-        
+
         # Verify create_log_stream was called with correct arguments
         mock_logs_client.create_log_stream.assert_called_once()
         call_args = mock_logs_client.create_log_stream.call_args[1]
         assert call_args['logGroupName'] == self.log_group_name
         assert self.id_value in call_args['logStreamName']
-        
+
         # Verify that put_log_events was called with correct arguments
         mock_logs_client.put_log_events.assert_called_once()
         call_args = mock_logs_client.put_log_events.call_args[1]
         assert call_args['logGroupName'] == self.log_group_name
         assert self.id_value in call_args['logStreamName']
-        
+
         # Check the log event content
         log_events = call_args['logEvents']
         assert len(log_events) == 1
         assert log_events[0]['timestamp'] == timestamp
-        
+
         # Verify the message content
         event_data = json.loads(log_events[0]['message'])
         assert event_data['id'] == self.id_value
@@ -190,12 +190,12 @@ class TestCloudWatchOperations:
         """Test querying CloudWatch Logs."""
         # Mock the CloudWatch Logs client
         mock_logs_client = MagicMock()
-        
+
         # Set up the mock to return a query ID and then results
         mock_logs_client.start_query.return_value = {
             "queryId": "test-query-id"
         }
-        
+
         mock_logs_client.get_query_results.return_value = {
             "status": "Complete",
             "results": [
@@ -206,7 +206,7 @@ class TestCloudWatchOperations:
                 ]
             ]
         }
-        
+
         # Test the query function
         with patch("src.lambda_function.lambda_handler.logs_client", mock_logs_client):
             start_time = datetime.now() - timedelta(hours=1)
@@ -245,8 +245,8 @@ class TestEventHandlers:
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.write_to_cloudwatch")
     def test_handle_create_event_api_gateway(
-        self, 
-        mock_write: MagicMock, 
+        self,
+        mock_write: MagicMock,
         mock_get_log_group: MagicMock
     ) -> None:
         """Test handling create event from API Gateway."""
@@ -274,8 +274,8 @@ class TestEventHandlers:
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.write_to_cloudwatch")
     def test_handle_create_event_appsync(
-        self, 
-        mock_write: MagicMock, 
+        self,
+        mock_write: MagicMock,
         mock_get_log_group: MagicMock
     ) -> None:
         """Test handling create event from AppSync."""
@@ -308,8 +308,8 @@ class TestEventHandlers:
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.query_cloudwatch_logs")
     def test_handle_read_event_api_gateway(
-        self, 
-        mock_query: MagicMock, 
+        self,
+        mock_query: MagicMock,
         mock_get_log_group: MagicMock
     ) -> None:
         """Test handling read event from API Gateway."""
@@ -343,8 +343,8 @@ class TestEventHandlers:
     @patch("src.lambda_function.lambda_handler.get_log_group_name")
     @patch("src.lambda_function.lambda_handler.query_cloudwatch_logs")
     def test_handle_read_event_appsync(
-        self, 
-        mock_query: MagicMock, 
+        self,
+        mock_query: MagicMock,
         mock_get_log_group: MagicMock
     ) -> None:
         """Test handling read event from AppSync."""
@@ -380,8 +380,8 @@ class TestLambdaHandler:
     @patch("src.lambda_function.lambda_handler.handle_create_event")
     @patch("src.lambda_function.lambda_handler.handle_read_event")
     def test_lambda_handler_api_gateway(
-        self, 
-        mock_read: MagicMock, 
+        self,
+        mock_read: MagicMock,
         mock_create: MagicMock
     ) -> None:
         """Test lambda_handler with API Gateway events."""
@@ -416,8 +416,8 @@ class TestLambdaHandler:
     @patch("src.lambda_function.lambda_handler.handle_create_event")
     @patch("src.lambda_function.lambda_handler.handle_read_event")
     def test_lambda_handler_appsync(
-        self, 
-        mock_read: MagicMock, 
+        self,
+        mock_read: MagicMock,
         mock_create: MagicMock
     ) -> None:
         """Test lambda_handler with AppSync events."""
