@@ -21,14 +21,14 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Initialize AWS clients
-appconfig_client = boto3.client('appconfig')
-logs_client = boto3.client('logs')
+appconfig_client = boto3.client("appconfig")
+logs_client = boto3.client("logs")
 
 # Constants
-APP_ID = os.environ.get('APPCONFIG_APP_ID', 'ServiceHistoryApp')
-ENV_ID = os.environ.get('APPCONFIG_ENV_ID', 'Production')
-CONFIG_PROFILE_ID = os.environ.get('APPCONFIG_CONFIG_PROFILE_ID', 'ServiceHistoryConfig')
-LOG_GROUP_CONFIG_KEY = 'logGroup'
+APP_ID = os.environ.get("APPCONFIG_APP_ID", "ServiceHistoryApp")
+ENV_ID = os.environ.get("APPCONFIG_ENV_ID", "Production")
+CONFIG_PROFILE_ID = os.environ.get("APPCONFIG_CONFIG_PROFILE_ID", "ServiceHistoryConfig")
+LOG_GROUP_CONFIG_KEY = "logGroup"
 
 
 class ValidationError(Exception):
@@ -61,11 +61,11 @@ def get_log_group_name() -> str:
             Application=APP_ID,
             Environment=ENV_ID,
             Configuration=CONFIG_PROFILE_ID,
-            ClientId='ServiceHistoryLambda'
+            ClientId="ServiceHistoryLambda",
         )
 
         try:
-            config_data = json.loads(response['Content'].read())
+            config_data = json.loads(response["Content"].read())
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Invalid AppConfig configuration format: {e!s}")
             raise ValidationError(f"Invalid configuration format: {e!s}") from e
@@ -110,7 +110,7 @@ def extract_id_from_path(path: str) -> str:
         if not path:
             raise ValidationError("Empty path provided")
 
-        match = re.search(r'/([^/]+)$', path)
+        match = re.search(r"/([^/]+)$", path)
         if not match:
             raise ValidationError("ID not found in request path")
 
@@ -173,15 +173,15 @@ def validate_read_input(query_params: Dict[str, str], id_value: str) -> Tuple[da
     start_time = None
     end_time = None
 
-    if 'start' in query_params:
+    if "start" in query_params:
         try:
-            start_time = parser.parse(query_params['start'])
+            start_time = parser.parse(query_params["start"])
         except ValueError as e:
             raise ValidationError("Invalid start time format. Expected ISO 8601 format.") from e
 
-    if 'end' in query_params:
+    if "end" in query_params:
         try:
-            end_time = parser.parse(query_params['end'])
+            end_time = parser.parse(query_params["end"])
         except ValueError as e:
             raise ValidationError("Invalid end time format. Expected ISO 8601 format.") from e
 
@@ -250,10 +250,7 @@ def _create_log_stream(log_group_name: str, log_stream_name: str) -> None:
         ValidationError: If log stream creation fails
     """
     try:
-        logs_client.create_log_stream(
-            logGroupName=log_group_name,
-            logStreamName=log_stream_name
-        )
+        logs_client.create_log_stream(logGroupName=log_group_name, logStreamName=log_stream_name)
     except logs_client.exceptions.ResourceAlreadyExistsException:
         pass
     except Exception as e:
@@ -262,10 +259,7 @@ def _create_log_stream(log_group_name: str, log_stream_name: str) -> None:
 
 
 def _put_log_event(
-    log_group_name: str,
-    log_stream_name: str,
-    timestamp: int,
-    event_data: Dict[str, Any]
+    log_group_name: str, log_stream_name: str, timestamp: int, event_data: Dict[str, Any]
 ) -> None:
     """Write log event to CloudWatch.
 
@@ -282,14 +276,9 @@ def _put_log_event(
         response = logs_client.put_log_events(
             logGroupName=log_group_name,
             logStreamName=log_stream_name,
-            logEvents=[
-                {
-                    "timestamp": timestamp,
-                    "message": json.dumps(event_data)
-                }
-            ]
+            logEvents=[{"timestamp": timestamp, "message": json.dumps(event_data)}],
         )
-        if 'rejectedLogEventsInfo' in response:
+        if "rejectedLogEventsInfo" in response:
             logger.warning(f"Some log events were rejected: {response['rejectedLogEventsInfo']}")
 
     except json.JSONDecodeError as e:
@@ -325,11 +314,7 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
         _create_log_stream(log_group_name, log_stream_name)
 
         # Create a structured log event with searchable fields
-        event_data = {
-            "id": id_value,
-            "timestamp": timestamp,
-            **data
-        }
+        event_data = {"id": id_value, "timestamp": timestamp, **data}
 
         # Write the log event
         _put_log_event(log_group_name, log_stream_name, timestamp, event_data)
@@ -343,10 +328,7 @@ def write_to_cloudwatch(log_group_name: str, id_value: str, data: Dict[str, Any]
 
 
 def query_cloudwatch_logs(
-    log_group_name: str,
-    id_value: str,
-    start_time: datetime,
-    end_time: datetime
+    log_group_name: str, id_value: str, start_time: datetime, end_time: datetime
 ) -> List[Dict[str, Any]]:
     """Query CloudWatch Logs for historical data.
 
@@ -370,7 +352,7 @@ def query_cloudwatch_logs(
         # Create a query that filters by the ID
         query = (
             f'fields @timestamp, @message | filter @message like "{id_value}" | '
-            f'sort @timestamp desc'
+            f"sort @timestamp desc"
         )
 
         # Start query
@@ -378,35 +360,35 @@ def query_cloudwatch_logs(
             logGroupName=log_group_name,
             startTime=start_time_ms,
             endTime=end_time_ms,
-            queryString=query
+            queryString=query,
         )
 
-        query_id = start_query_response['queryId']
+        query_id = start_query_response["queryId"]
 
         # Poll for query results
         response = None
-        while response is None or response['status'] == 'Running':
+        while response is None or response["status"] == "Running":
             time.sleep(0.5)  # Wait before checking again
             response = logs_client.get_query_results(queryId=query_id)
 
         results = []
-        for result in response.get('results', []):
+        for result in response.get("results", []):
             message = None
             timestamp = None
 
             for field in result:
-                if field['field'] == '@message':
+                if field["field"] == "@message":
                     try:
-                        message = json.loads(field['value'])
+                        message = json.loads(field["value"])
                     except json.JSONDecodeError:
-                        message = field['value']
-                elif field['field'] == '@timestamp':
-                    timestamp = field['value']
+                        message = field["value"]
+                elif field["field"] == "@timestamp":
+                    timestamp = field["value"]
 
             if message:
                 # Add timestamp if available
                 if timestamp and isinstance(message, dict):
-                    message['@timestamp'] = timestamp
+                    message["@timestamp"] = timestamp
                 results.append(message)
 
         return results
@@ -433,21 +415,19 @@ def handle_create_event(event: Dict[str, Any]) -> Dict[str, Any]:
     body = {}
 
     # Handle API Gateway event
-    if 'path' in event:
-        path = event['path']
-        if 'body' in event:
+    if "path" in event:
+        path = event["path"]
+        if "body" in event:
             try:
                 body = (
-                    json.loads(event['body'])
-                    if isinstance(event['body'], str)
-                    else event['body']
+                    json.loads(event["body"]) if isinstance(event["body"], str) else event["body"]
                 )
             except json.JSONDecodeError as e:
                 raise ValidationError("Invalid JSON in request body") from e
     # Handle AppSync event
-    elif 'info' in event and 'fieldName' in event['info']:
-        path = event['info'].get('fieldName', '')
-        body = event.get('arguments', {})
+    elif "info" in event and "fieldName" in event["info"]:
+        path = event["info"].get("fieldName", "")
+        body = event.get("arguments", {})
     else:
         raise ValidationError("Unsupported event format")
 
@@ -464,14 +444,10 @@ def handle_create_event(event: Dict[str, Any]) -> Dict[str, Any]:
     # Return success response
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "message": "Data successfully recorded",
-            "id": id_value,
-            "success": True
-        }),
-        "headers": {
-            "Content-Type": "application/json"
-        }
+        "body": json.dumps(
+            {"message": "Data successfully recorded", "id": id_value, "success": True}
+        ),
+        "headers": {"Content-Type": "application/json"},
     }
 
 
@@ -492,13 +468,13 @@ def handle_read_event(event: Dict[str, Any]) -> Dict[str, Any]:
     query_params = {}
 
     # Handle API Gateway event
-    if 'path' in event:
-        path = event['path']
-        query_params = event.get('queryStringParameters', {}) or {}
+    if "path" in event:
+        path = event["path"]
+        query_params = event.get("queryStringParameters", {}) or {}
     # Handle AppSync event
-    elif 'info' in event and 'fieldName' in event['info']:
-        path = event['info'].get('fieldName', '')
-        query_params = event.get('arguments', {})
+    elif "info" in event and "fieldName" in event["info"]:
+        path = event["info"].get("fieldName", "")
+        query_params = event.get("arguments", {})
     else:
         raise ValidationError("Unsupported event format")
 
@@ -515,23 +491,20 @@ def handle_read_event(event: Dict[str, Any]) -> Dict[str, Any]:
     # Return response with results
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "id": id_value,
-            "startTime": start_time.isoformat(),
-            "endTime": end_time.isoformat(),
-            "count": len(results),
-            "records": results
-        }),
-        "headers": {
-            "Content-Type": "application/json"
-        }
+        "body": json.dumps(
+            {
+                "id": id_value,
+                "startTime": start_time.isoformat(),
+                "endTime": end_time.isoformat(),
+                "count": len(results),
+                "records": results,
+            }
+        ),
+        "headers": {"Content-Type": "application/json"},
     }
 
 
-def lambda_handler(
-    event: Dict[str, Any],
-    context: object
-) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: object) -> Dict[str, Any]:
     """AWS Lambda handler function.
 
     Args:
@@ -551,65 +524,50 @@ def lambda_handler(
         method = ""
 
         # Handle API Gateway event
-        if 'httpMethod' in event:
-            method = event['httpMethod']
+        if "httpMethod" in event:
+            method = event["httpMethod"]
         # Handle AppSync event
-        elif 'info' in event and 'fieldName' in event['info']:
-            operation_type = event['info'].get('parentTypeName', '').upper()
-            if operation_type == 'MUTATION':
-                method = 'POST'  # Treat mutations as POST
-            elif operation_type == 'QUERY':
-                method = 'GET'   # Treat queries as GET
+        elif "info" in event and "fieldName" in event["info"]:
+            operation_type = event["info"].get("parentTypeName", "").upper()
+            if operation_type == "MUTATION":
+                method = "POST"  # Treat mutations as POST
+            elif operation_type == "QUERY":
+                method = "GET"  # Treat queries as GET
 
         # Process based on method
-        if method == 'POST' or method == 'PUT':
+        if method == "POST" or method == "PUT":
             return handle_create_event(event)
-        elif method == 'GET':
+        elif method == "GET":
             return handle_read_event(event)
-        elif method == 'DELETE' or method == 'PATCH':
+        elif method == "DELETE" or method == "PATCH":
             return {
                 "statusCode": 405,
-                "body": json.dumps({
-                    "message": "Method not allowed. Update and Delete operations are not "
-                               "supported.",
-                    "success": False
-                }),
-                "headers": {
-                    "Content-Type": "application/json"
-                }
+                "body": json.dumps(
+                    {
+                        "message": "Method not allowed. Update and Delete operations are not "
+                        "supported.",
+                        "success": False,
+                    }
+                ),
+                "headers": {"Content-Type": "application/json"},
             }
         else:
             return {
                 "statusCode": 400,
-                "body": json.dumps({
-                    "message": f"Unsupported method: {method}",
-                    "success": False
-                }),
-                "headers": {
-                    "Content-Type": "application/json"
-                }
+                "body": json.dumps({"message": f"Unsupported method: {method}", "success": False}),
+                "headers": {"Content-Type": "application/json"},
             }
 
     except ValidationError as e:
         return {
             "statusCode": e.status_code,
-            "body": json.dumps({
-                "message": e.message,
-                "success": False
-            }),
-            "headers": {
-                "Content-Type": "application/json"
-            }
+            "body": json.dumps({"message": e.message, "success": False}),
+            "headers": {"Content-Type": "application/json"},
         }
     except Exception as e:
         logger.error(f"Unhandled exception: {e!s}")
         return {
             "statusCode": 500,
-            "body": json.dumps({
-                "message": "Internal server error",
-                "success": False
-            }),
-            "headers": {
-                "Content-Type": "application/json"
-            }
+            "body": json.dumps({"message": "Internal server error", "success": False}),
+            "headers": {"Content-Type": "application/json"},
         }
