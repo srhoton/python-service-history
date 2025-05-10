@@ -10,7 +10,6 @@ import pytest
 from dateutil import parser
 
 # Import the module, not just the functions
-import src.lambda_function.lambda_handler as lambda_handler_module
 from src.lambda_function.lambda_handler import (
     ValidationError,
     extract_id_from_path,
