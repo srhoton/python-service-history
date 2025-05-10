@@ -437,8 +437,8 @@ def handle_create_event(event: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 id_value = extract_id_from_path(path)
             except ValidationError:
-                raise ValidationError("ID not found in AppSync event")
-        
+                raise ValidationError("ID not found in AppSync event") from None
+
         # Use the 'data' field from arguments if it exists, otherwise use arguments
         body = arguments.get("data", arguments)
     else:
@@ -496,7 +496,7 @@ def handle_read_event(event: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 id_value = extract_id_from_path(path)
             except ValidationError:
-                raise ValidationError("ID not found in AppSync event")
+                raise ValidationError("ID not found in AppSync event") from None
     else:
         raise ValidationError("Unsupported event format")
 
